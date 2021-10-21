@@ -6,6 +6,8 @@ from graphgym.contrib.loss import *
 import graphgym.register as register
 from graphgym.config import cfg
 
+import tensorflow as tf
+
 def compute_loss(pred, true):
     '''
 
@@ -46,4 +48,20 @@ def compute_loss(pred, true):
     else:
         raise ValueError('Loss func {} not supported'.
                          format(cfg.model.loss_fun))
+
+
+def compute_loss_Tfg(logits, mask_index, labels, vars):
+    masked_logits = tf.gather(logits, mask_index)
+    # masked_labels = tf.gather(graph.y, mask_index)
+    # labels = tf.gather(graph.y, mask_index)
+
+    losses = tf.nn.softmax_cross_entropy_with_logits(
+        logits=masked_logits,
+        labels=tf.one_hot(tf.convert_to_tensor(labels), depth=num_classes)
+    )
+
+    kernel_vars = [var for var in vars if "kernel" in var.name]
+    l2_losses = [tf.nn.l2_loss(kernel_var) for kernel_var in kernel_vars]
+
+    return tf.reduce_mean(losses) + tf.add_n(l2_losses) * 5e-4
 

@@ -107,14 +107,14 @@ def load_dataset():
         if graphs is not None:
             return graphs
     # Load from Pytorch Geometric dataset
-    if format == 'PyG':
+    if format == 'PyG' or format[4:] == 'PyG':
         graphs = load_pyg(name, dataset_dir)
     # Load from networkx formatted data
     # todo: clean nx dataloader
-    elif format == 'nx':
+    elif format == 'nx' or format[4:] == 'PyG':
         graphs = load_nx(name, dataset_dir)
     # Load from OGB formatted data
-    elif cfg.dataset.format == 'OGB':
+    elif cfg.dataset.format == 'OGB' or format[4:] == 'PyG':
         if cfg.dataset.name == 'ogbg-molhiv':
             dataset = PygGraphPropPredDataset(name=cfg.dataset.name)
             graphs = GraphDataset.pyg_to_graphs(dataset)

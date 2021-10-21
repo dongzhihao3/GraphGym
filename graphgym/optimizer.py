@@ -5,6 +5,7 @@ import torch.optim as optim
 from graphgym.contrib.optimizer import *
 import graphgym.register as register
 
+import tensorflow as tf
 
 def create_optimizer(params):
     params = filter(lambda p: p.requires_grad, params)
@@ -14,8 +15,12 @@ def create_optimizer(params):
         if optimizer is not None:
             return optimizer
     if cfg.optim.optimizer == 'adam':
-        optimizer = optim.Adam(params, lr=cfg.optim.base_lr,
+        if cfg.dataset.format[:3] == 'Tfg':
+            optimizer = tf.keras.optimizers.Adam(learning_rate=cfg.optim.base_lr)
+        else:
+            optimizer = optim.Adam(params, lr=cfg.optim.base_lr,
                                weight_decay=cfg.optim.weight_decay)
+
     elif cfg.optim.optimizer == 'sgd':
         optimizer = optim.SGD(params, lr=cfg.optim.base_lr,
                               momentum=cfg.optim.momentum,

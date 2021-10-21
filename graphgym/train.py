@@ -3,9 +3,22 @@ import time
 import logging
 
 from graphgym.config import cfg
-from graphgym.loss import compute_loss
+from graphgym.loss import compute_loss, compute_loss_Tfg
 from graphgym.utils.epoch import is_eval_epoch, is_ckpt_epoch
 from graphgym.checkpoint import load_ckpt, save_ckpt, clean_ckpt
+
+
+
+import os
+#os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+from tf_geometric.utils import tf_utils
+import tensorflow as tf
+import tf_geometric as tfg
+from tqdm import tqdm
+import time
+from tf_geometric.data.graph import Graph
+
+
 
 
 def train_epoch(logger, loader, model, optimizer, scheduler):
@@ -28,6 +41,33 @@ def train_epoch(logger, loader, model, optimizer, scheduler):
     scheduler.step()
 
 
+
+
+def train_epoch_Tfg(logger, loader, model, optimizer, scheduler):
+    loss_s = 0
+    time_start = time.time()
+    for batch in loader:
+        graph = Graph(x=batch.node_feature.numpy(), edge_index=batch.edge_index.numpy(), y=batch.node_label.numpy())
+        with tf.GradientTape() as tape:
+
+            logits = model([graph.x, graph.edge_index, graph.edge_weight], training=True)
+            #print(logits)
+            loss = compute_loss_Tfg(logits, batch.node_label_index, batch.node_label, tape.watched_variables())
+            vars = tape.watched_variables()
+            grads = tape.gradient(loss, vars)
+            optimizer.apply_gradients(zip(grads, vars))
+        logger.update_stats(loss=loss.item(),
+                            lr=scheduler.get_last_lr()[0],
+                            time_used=time.time() - time_start,
+                            params=cfg.params)
+        time_start = time.time()
+    scheduler.step()
+
+
+
+
+
+
 @torch.no_grad()
 def eval_epoch(logger, loader, model):
     model.eval()
@@ -45,6 +85,10 @@ def eval_epoch(logger, loader, model):
         time_start = time.time()
 
 
+
+
+
+
 def train(loggers, loaders, model, optimizer, scheduler):
     start_epoch = 0
     if cfg.train.auto_resume:
@@ -56,7 +100,10 @@ def train(loggers, loaders, model, optimizer, scheduler):
 
     num_splits = len(loggers)
     for cur_epoch in range(start_epoch, cfg.optim.max_epoch):
-        train_epoch(loggers[0], loaders[0], model, optimizer, scheduler)
+        if not cfg.dataset.format[:3] == 'Tfg':
+            train_epoch(loggers[0], loaders[0], model, optimizer, scheduler)
+        else:
+            train_epoch_Tfg(loggers[0], loaders[0], model, optimizer, scheduler)
         loggers[0].write_epoch(cur_epoch)
         if is_eval_epoch(cur_epoch):
             for i in range(1, num_splits):
